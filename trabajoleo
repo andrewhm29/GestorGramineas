@@ -1,0 +1,549 @@
+📦 PROYECTO COMPLETO: Gestor de Gramíneas con Contador
+📁 Estructura del Proyecto
+EjemploSQLite/
+├── app/
+│   ├── src/
+│   │   └── main/
+│   │       ├── java/com/example/ejemplosqlite/
+│   │       │   ├── MainActivity.java
+│   │       │   └── AdminSQLiteOpenHelper.java
+│   │       ├── res/
+│   │       │   ├── drawable/
+│   │       │   │   ├── background_gradient.xml
+│   │       │   │   ├── edittext_border.xml
+│   │       │   │   ├── ic_grass.xml
+│   │       │   │   ├── ic_counter.xml
+│   │       │   │   ├── ic_first.xml
+│   │       │   │   ├── ic_previous.xml
+│   │       │   │   ├── ic_next.xml
+│   │       │   │   ├── ic_last.xml
+│   │       │   │   ├── ic_add.xml
+│   │       │   │   ├── ic_delete.xml
+│   │       │   │   ├── ic_edit.xml
+│   │       │   │   └── ic_search.xml
+│   │       │   ├── layout/
+│   │       │   │   └── activity_main.xml
+│   │       │   └── values/
+│   │       │       ├── colors.xml
+│   │       │       ├── strings.xml
+│   │       │       └── styles.xml
+│   │       └── AndroidManifest.xml
+│   └── build.gradle
+└── build.gradle (Project)
+
+📄 ARCHIVOS COMPLETOS
+1️⃣ MainActivity.java
+Ruta: app/src/main/java/com/example/ejemplosqlite/MainActivity.java
+javapackage com.example.ejemplosqlite;
+
+import androidx.appcompat.app.AppCompatActivity;
+import android.content.ContentValues;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.os.Bundle;
+import android.widget.TextView;
+import android.widget.Toast;
+import com.google.android.material.button.MaterialButton;
+import com.google.android.material.textfield.TextInputEditText;
+
+public class MainActivity extends AppCompatActivity {
+
+    private MaterialButton btnRegistroInicio, btnRegistroAtras, btnRegistroAdelante, btnRegistroFinal;
+    private MaterialButton btnAgregar, btnEliminar, btnModificar, btnBuscar;
+    private TextInputEditText editTextId, editTextNombre, editTextDescripcion;
+    private TextView textViewInfo;
+    private AdminSQLiteOpenHelper admin;
+    private Cursor cursor;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_main);
+        inicializarVistasMaterial();
+        conectarBaseDatos();
+        cargarDatos();
+        configurarListenersMaterial();
+        if (cursor != null && cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            mostrarRegistro();
+        }
+    }
+
+    private void inicializarVistasMaterial() {
+        btnRegistroInicio = findViewById(R.id.btnRegistroInicio);
+        btnRegistroAtras = findViewById(R.id.btnRegistroAtras);
+        btnRegistroAdelante = findViewById(R.id.btnRegistroAdelante);
+        btnRegistroFinal = findViewById(R.id.btnRegistroFinal);
+        btnAgregar = findViewById(R.id.btnAgregar);
+        btnEliminar = findViewById(R.id.btnEliminar);
+        btnModificar = findViewById(R.id.btnModificar);
+        btnBuscar = findViewById(R.id.btnBuscar);
+        editTextId = findViewById(R.id.editTextId);
+        editTextNombre = findViewById(R.id.editTextNombre);
+        editTextDescripcion = findViewById(R.id.editTextDescripcion);
+        textViewInfo = findViewById(R.id.textViewInfo);
+    }
+
+    private void configurarListenersMaterial() {
+        btnAgregar.setOnClickListener(v -> agregarRegistro());
+        btnEliminar.setOnClickListener(v -> eliminarRegistro());
+        btnModificar.setOnClickListener(v -> modificarRegistro());
+        btnBuscar.setOnClickListener(v -> buscarRegistro());
+        btnRegistroInicio.setOnClickListener(v -> navegarPrimero());
+        btnRegistroAtras.setOnClickListener(v -> navegarAnterior());
+        btnRegistroAdelante.setOnClickListener(v -> navegarSiguiente());
+        btnRegistroFinal.setOnClickListener(v -> navegarUltimo());
+    }
+
+    private void navegarPrimero() {
+        if (cursor != null && cursor.getCount() > 0) {
+            cursor.moveToFirst();
+            mostrarRegistro();
+            animarBoton(btnRegistroInicio);
+        }
+    }
+
+    private void navegarAnterior() {
+        if (cursor != null && cursor.getCount() > 0) {
+            int actual = cursor.getPosition();
+            if (actual > 0) {
+                cursor.moveToPrevious();
+                mostrarRegistro();
+                animarBoton(btnRegistroAtras);
+            } else {
+                Toast.makeText(this, "Ya estás en el primer registro", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void navegarSiguiente() {
+        if (cursor != null && cursor.getCount() > 0) {
+            int actual = cursor.getPosition();
+            if (actual < cursor.getCount() - 1) {
+                cursor.moveToNext();
+                mostrarRegistro();
+                animarBoton(btnRegistroAdelante);
+            } else {
+                Toast.makeText(this, "Ya estás en el último registro", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    private void navegarUltimo() {
+        if (cursor != null && cursor.getCount() > 0) {
+            cursor.moveToLast();
+            mostrarRegistro();
+            animarBoton(btnRegistroFinal);
+        }
+    }
+
+    private void animarBoton(MaterialButton boton) {
+        boton.animate().scaleX(0.9f).scaleY(0.9f).setDuration(100)
+            .withEndAction(() -> boton.animate().scaleX(1f).scaleY(1f).setDuration(100).start()).start();
+    }
+
+    private void conectarBaseDatos() {
+        try {
+            admin = new AdminSQLiteOpenHelper(this);
+        } catch (Exception e) {
+            Toast.makeText(this, "Error al conectar con BD", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    public void cargarDatos() {
+        try {
+            if (cursor != null && !cursor.isClosed()) {
+                cursor.close();
+            }
+            cursor = admin.obtenerTodosLosRegistros();
+            actualizarInfoRegistro();
+        } catch (Exception e) {
+            Toast.makeText(this, "Error al cargar datos", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void agregarRegistro() {
+        String nombre = editTextNombre.getText().toString().trim();
+        String descripcion = editTextDescripcion.getText().toString().trim();
+        if (nombre.isEmpty() || descripcion.isEmpty()) {
+            Toast.makeText(this, "Completa todos los campos", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            SQLiteDatabase db = admin.getWritableDatabase();
+            ContentValues values = new ContentValues();
+            values.put(AdminSQLiteOpenHelper.COLUMN_NOMBRE, nombre);
+            values.put(AdminSQLiteOpenHelper.COLUMN_DESCRIPCION, descripcion);
+            long resultado = db.insert(AdminSQLiteOpenHelper.TABLE_GRAMINEAS, null, values);
+            db.close();
+            if (resultado != -1) {
+                Toast.makeText(this, "✅ Registro agregado", Toast.LENGTH_SHORT).show();
+                cargarDatos();
+                if (cursor.getCount() > 0) {
+                    cursor.moveToLast();
+                    mostrarRegistro();
+                }
+                limpiarCamposParaNuevo();
+                animarBoton(btnAgregar);
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Error al agregar", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void eliminarRegistro() {
+        String id = editTextId.getText().toString().trim();
+        if (id.isEmpty()) {
+            Toast.makeText(this, "Selecciona un registro", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            SQLiteDatabase db = admin.getWritableDatabase();
+            int resultado = db.delete(AdminSQLiteOpenHelper.TABLE_GRAMINEAS,
+                AdminSQLiteOpenHelper.COLUMN_ID + " = ?", new String[]{id});
+            db.close();
+            if (resultado == 1) {
+                Toast.makeText(this, "🗑️ Registro eliminado", Toast.LENGTH_SHORT).show();
+                cargarDatos();
+                if (cursor.getCount() > 0) {
+                    cursor.moveToFirst();
+                    mostrarRegistro();
+                } else {
+                    limpiarCampos();
+                }
+                animarBoton(btnEliminar);
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Error al eliminar", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void modificarRegistro() {
+        String id = editTextId.getText().toString().trim();
+        String nombre = editTextNombre.getText().toString().trim();
+        String descripcion = editTextDescripcion.getText().toString().trim();
+        if (id.isEmpty() || nombre.isEmpty() || descripcion.isEmpty()) {
+            Toast.makeText(this, "Completa todos los campos", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            SQLiteDatabase db = admin.getWritableDatabase();
+            ContentValues values = new ContentValues();
+            values.put(AdminSQLiteOpenHelper.COLUMN_NOMBRE, nombre);
+            values.put(AdminSQLiteOpenHelper.COLUMN_DESCRIPCION, descripcion);
+            int resultado = db.update(AdminSQLiteOpenHelper.TABLE_GRAMINEAS, values,
+                AdminSQLiteOpenHelper.COLUMN_ID + " = ?", new String[]{id});
+            db.close();
+            if (resultado == 1) {
+                Toast.makeText(this, "✏️ Registro modificado", Toast.LENGTH_SHORT).show();
+                cargarDatos();
+                animarBoton(btnModificar);
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "Error al modificar", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    private void buscarRegistro() {
+        String id = editTextId.getText().toString().trim();
+        if (id.isEmpty()) {
+            Toast.makeText(this, "Ingresa un ID", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try {
+            Cursor fila = admin.buscarPorId(id);
+            if (fila.moveToFirst()) {
+                editTextId.setText(fila.getString(0));
+                editTextNombre.setText(fila.getString(1));
+                editTextDescripcion.setText(fila.getString(2));
+                Toast.makeText(this, "🔍 Registro encontrado", Toast.LENGTH_SHORT).show();
+                actualizarInfoRegistro();
+                animarBoton(btnBuscar);
+            } else {
+                Toast.makeText(this, "Registro no encontrado", Toast.LENGTH_SHORT).show();
+            }
+            fila.close();
+        } catch (Exception e) {
+            Toast.makeText(this, "Error en búsqueda", Toast.LENGTH_LONG).show();
+        }
+    }
+
+    public void mostrarRegistro() {
+        if (cursor != null && cursor.getCount() > 0 && !cursor.isAfterLast()) {
+            editTextId.setText(cursor.getString(0));
+            editTextNombre.setText(cursor.getString(1));
+            editTextDescripcion.setText(cursor.getString(2));
+            actualizarInfoRegistro();
+        } else {
+            limpiarCampos();
+        }
+    }
+
+    private void actualizarInfoRegistro() {
+        if (cursor != null && cursor.getCount() > 0) {
+            int actual = cursor.getPosition() + 1;
+            int total = cursor.getCount();
+            textViewInfo.setText("📊 Registro " + actual + " de " + total);
+        } else {
+            textViewInfo.setText("📊 No hay registros");
+        }
+    }
+
+    private void limpiarCampos() {
+        editTextId.setText("");
+        editTextNombre.setText("");
+        editTextDescripcion.setText("");
+        actualizarInfoRegistro();
+    }
+
+    private void limpiarCamposParaNuevo() {
+        editTextNombre.setText("");
+        editTextDescripcion.setText("");
+        editTextNombre.requestFocus();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (cursor != null && !cursor.isClosed()) {
+            cursor.close();
+        }
+    }
+}
+
+2️⃣ AdminSQLiteOpenHelper.java
+Ruta: app/src/main/java/com/example/ejemplosqlite/AdminSQLiteOpenHelper.java
+javapackage com.example.ejemplosqlite;
+
+import android.content.Context;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteOpenHelper;
+
+public class AdminSQLiteOpenHelper extends SQLiteOpenHelper {
+    
+    private static final String DATABASE_NAME = "gramineas.db";
+    private static final int DATABASE_VERSION = 1;
+    
+    public static final String TABLE_GRAMINEAS = "gramineas";
+    public static final String COLUMN_ID = "idgraminea";
+    public static final String COLUMN_NOMBRE = "nombrecomun";
+    public static final String COLUMN_DESCRIPCION = "descripcion";
+
+    public AdminSQLiteOpenHelper(Context context) {
+        super(context, DATABASE_NAME, null, DATABASE_VERSION);
+    }
+
+    @Override
+    public void onCreate(SQLiteDatabase db) {
+        String CREATE_TABLE = "CREATE TABLE " + TABLE_GRAMINEAS + "(" +
+                COLUMN_ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                COLUMN_NOMBRE + " TEXT, " +
+                COLUMN_DESCRIPCION + " TEXT)";
+        db.execSQL(CREATE_TABLE);
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        db.execSQL("DROP TABLE IF EXISTS " + TABLE_GRAMINEAS);
+        onCreate(db);
+    }
+
+    public Cursor obtenerTodosLosRegistros() {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String query = "SELECT * FROM " + TABLE_GRAMINEAS + " ORDER BY " + COLUMN_ID;
+        return db.rawQuery(query, null);
+    }
+
+    public Cursor buscarPorId(String id) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        String query = "SELECT * FROM " + TABLE_GRAMINEAS + 
+                      " WHERE " + COLUMN_ID + " = ?";
+        return db.rawQuery(query, new String[]{id});
+    }
+}
+
+3️⃣ activity_main.xml
+Ruta: app/src/main/res/layout/activity_main.xml
+(YA LO TIENES - Es el que me enviaste)
+
+4️⃣ ARCHIVOS DRAWABLE
+background_gradient.xml
+Ruta: app/src/main/res/drawable/background_gradient.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <gradient
+        android:startColor="#E3F2FD"
+        android:endColor="#FFFFFF"
+        android:angle="270" />
+</shape>
+edittext_border.xml
+(YA LO TIENES)
+ic_grass.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M12,20C9.24,20 7,17.76 7,15H9C9,16.66 10.34,18 12,18C13.66,18 15,16.66 15,15H17C17,17.76 14.76,20 12,20M12,2L9,6L12,10L15,6L12,2M6,8L3,12L6,16L9,12L6,8M18,8L15,12L18,16L21,12L18,8Z" />
+</vector>
+ic_counter.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/primary_color"
+        android:pathData="M4,6H2V20C2,21.1 2.9,22 4,22H18V20H4V6M20,2H8C6.9,2 6,2.9 6,4V16C6,17.1 6.9,18 8,18H20C21.1,18 22,17.1 22,16V4C22,2.9 21.1,2 20,2M20,16H8V4H20V16M13,14H15V11H18V9H15V6H13V9H10V11H13V14Z" />
+</vector>
+ic_first.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M18.41,16.59L13.82,12L18.41,7.41L17,6L11,12L17,18L18.41,16.59M6,6H8V18H6V6Z" />
+</vector>
+ic_previous.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M15.41,16.59L10.83,12L15.41,7.41L14,6L8,12L14,18L15.41,16.59Z" />
+</vector>
+ic_next.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M8.59,16.59L13.17,12L8.59,7.41L10,6L16,12L10,18L8.59,16.59Z" />
+</vector>
+ic_last.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M5.59,7.41L10.18,12L5.59,16.59L7,18L13,12L7,6L5.59,7.41M16,6H18V18H16V6Z" />
+</vector>
+ic_add.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M19,13H13V19H11V13H5V11H11V5H13V11H19V13Z" />
+</vector>
+ic_delete.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M19,4H15.5L14.5,3H9.5L8.5,4H5V6H19M6,19C6,20.1 6.9,21 8,21H16C17.1,21 18,20.1 18,19V7H6V19Z" />
+</vector>
+ic_edit.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z" />
+</vector>
+ic_search.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:pathData="M9.5,3C13.09,3 16,5.91 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16C5.91,16 3,13.09 3,9.5C3,5.91 5.91,3 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" />
+</vector>
+
+5️⃣ ARCHIVOS VALUES
+colors.xml
+(YA LO TIENES)
+strings.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Gestor de Gramíneas</string>
+</resources>
+styles.xml
+xml<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="AppTheme" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
+        <item name="colorPrimary">@color/primary_color</item>
+        <item name="colorPrimaryDark">@color/primary_dark</item>
+        <item name="colorAccent">@color/primary_color</item>
+    </style>
+</resources>
+
+6️⃣ AndroidManifest.xml
+(YA LO TIENES)
+
+7️⃣ build.gradle (Module: app)
+gradleplugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.example.ejemplosqlite'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.example.ejemplosqlite"
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+    implementation 'androidx.cardview:cardview:1.0.0'
+}
